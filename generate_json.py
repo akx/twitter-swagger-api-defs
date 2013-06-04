@@ -1,3 +1,4 @@
+import os
 import re
 import urlparse
 from lxml.html import HTMLParser
@@ -16,7 +17,10 @@ def inner_text(el):
 
 def parse_tree(tree):
     title = inner_text(tree.cssselect("#title"))
+    if not ("GET" in title or "POST" in title):
+        return None
     is_post = title.startswith("POST")
+
     endpoint = inner_text(tree.cssselect(".field-doc-resource-url div")).replace("format", "{format}")
     description = inner_text(tree.cssselect(".doc-updated+div>p"))
     url_params = set()
@@ -82,10 +86,18 @@ def parse_from_zip():
 
 def main():
     from json import dumps
-    apis = parse_from_zip()
-    apis.sort(key=lambda api:api["path"])
-    print "%d API definitions parsed." % len(apis)
-    file("twitter_api.json", "wb").write(dumps(apis, indent=4))
+    apis = dict((api["path"], api) for api in parse_from_zip() if api).values()
+    print "%d unique API definitions parsed." % len(apis)
+
+    spec = {
+	    "apiVersion": "1.1",
+        "swaggerVersion": "1.1",
+        "basePath": "https://api.twitter.com",
+        "description": u"Twitter",
+        "apis": sorted(apis, key=lambda api:api["path"]),
+    }
+
+    file("twitter_api.json", "wb").write(dumps(spec, indent=4))
 
 
 if __name__ == "__main__":
